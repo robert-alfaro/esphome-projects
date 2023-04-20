@@ -1,10 +1,11 @@
 esphome:
   name: pergola-fan-remote
+  friendly_name: Pergola Fan
 
 esp32:
   board: esp32-c3-devkitm-1
   framework:
-    type: arduino
+    type: esp-idf
 
 logger:
 api:
@@ -13,12 +14,6 @@ ota:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_pass
-
-  # Enable fallback hotspot (captive portal) in case wifi connection fails
-  ap:
-    ssid: "Pergola-Fan-Remote"
-
-captive_portal:
 
 binary_sensor:
   # Fan running state
