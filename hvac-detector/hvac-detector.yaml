@@ -1,0 +1,142 @@
+substitutions:
+  display_name: hvac-detector
+  tag: hvacd
+
+esphome:
+  name: ${display_name}
+  friendly_name: "HVAC Detector"
+
+esp32:
+  board: m5stick-c
+
+logger:
+api:
+ota:
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_pass
+
+captive_portal:
+
+i2c:
+  sda: 21
+  scl: 22
+
+globals:
+  - id: base_accel_x
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+  - id: base_accel_y
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+  - id: base_accel_z
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+
+sensor:
+  - platform: uptime
+    name: "Uptime"
+    entity_category: diagnostic
+
+  - platform: mpu6050  # actually using mpu9250..same registers for accel
+                       # requires disabling WHOAMI inside esphome source:
+                       #   esphome/components/mpu6050/mpu6050.cpp
+    address: 0x68
+    accel_x:
+      id: accel_x
+      name: "Accel X"
+      filters:
+       - sliding_window_moving_average:
+          window_size: 10
+          send_every: 1
+    accel_y:
+      id: accel_y
+      name: "Accel Y"
+      filters:
+       - sliding_window_moving_average:
+          window_size: 10
+          send_every: 1
+    accel_z:
+      id: accel_z
+      name: "Accel Z"
+      filters:
+       - sliding_window_moving_average:
+          window_size: 10
+          send_every: 1
+    update_interval: 500ms
+
+  - platform: template
+    id: total_accel
+    name: "Total Acceleration"
+    state_class: measurement
+    icon: mdi:axis-arrow
+    accuracy_decimals: 6
+    lambda: |-
+      // get changes per axis
+      float delta_x = fabs( id(accel_x).state - id(base_accel_x) );
+      float delta_y = fabs( id(accel_y).state - id(base_accel_y) );
+      float delta_z = fabs( id(accel_z).state - id(base_accel_z) );
+
+      // combine into net vibration
+      return delta_x + delta_y + delta_z;
+    filters:
+     - sliding_window_moving_average:
+        window_size: 10
+        send_every: 1
+    update_interval: 500ms
+    on_value:
+      - if:
+          condition:
+            lambda: return x >= 0.1;
+          then:
+            - binary_sensor.template.publish:
+                id: vibration_detected
+                state: ON
+      - if:
+          condition:
+            lambda: return x <= 0.025;
+          then:
+            - binary_sensor.template.publish:
+                id: vibration_detected
+                state: OFF
+      - if:
+          condition:
+            for:
+              time: 10s
+              condition:
+                lambda: return id(total_accel).state < 0.06;
+          then:
+            - binary_sensor.template.publish:
+                id: vibration_detected
+                state: OFF
+
+binary_sensor:
+  - platform: template
+    id: vibration_detected
+    name: Vibration Detected
+    device_class: vibration
+
+button:
+  - platform: restart
+    name: "Restart"
+    entity_category: diagnostic
+
+  - platform: safe_mode
+    name: Restart (Safe Mode)
+    entity_category: diagnostic
+
+  - platform: template
+    name: "Calibrate Baseline"
+    entity_category: diagnostic
+    on_press:
+      lambda: |-
+        id(base_accel_x) = id(accel_x).state;
+        id(base_accel_y) = id(accel_y).state;
+        id(base_accel_z) = id(accel_z).state;
+        ESP_LOGD("${tag}", "Calibrated accelerometer baselines: x=%0.6f, y=%0.6f, z=%0.6f",
+                           id(base_accel_x), id(base_accel_y), id(base_accel_z));
+

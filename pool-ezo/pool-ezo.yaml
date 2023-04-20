@@ -1,0 +1,83 @@
+esphome:
+  name: pool-ezo
+  friendly_name: "Pool EZO"
+
+esp32:
+  board: mhetesp32minikit  # quinled-esp32
+
+logger:
+api:
+ota:
+
+ethernet:
+  type: LAN8720
+  mdc_pin: GPIO23
+  mdio_pin: GPIO18
+  clk_mode: GPIO17_OUT
+  phy_addr: 0
+  power_pin: GPIO5
+
+i2c:
+  - id: bus_a
+    sda: 2  # EZO TX
+    scl: 4  # EZO RX
+    scan: true
+
+sensor:
+  - platform: ezo
+    id: pool_ezo_orp
+    name: "ORP"
+    state_class: "measurement"
+    icon: "mdi:lightning-bolt"
+    i2c_id: bus_a
+    address: 98
+    accuracy_decimals: 1
+    unit_of_measurement: "mV"
+    update_interval: 10s
+
+  - platform: ezo
+    id: pool_ezo_ph
+    name: "pH"
+    state_class: "measurement"
+    icon: "mdi:ph"
+    i2c_id: bus_a
+    address: 99
+    accuracy_decimals: 3
+    unit_of_measurement: "pH"
+    update_interval: 10s
+
+  - platform: uptime
+    name: "Uptime"
+
+button:
+  - platform: restart
+    name: "Restart"
+
+  - platform: template
+    entity_category: config
+    name: "ORP Calibrate"
+    icon: "mdi:tune-vertical"
+    on_press:
+      lambda: id(pool_ezo_orp).set_calibration_generic(225.0);
+
+  - platform: template
+    entity_category: config
+    name: "pH Calibrate Mid"
+    icon: "mdi:tune-vertical"
+    on_press:
+      lambda: id(pool_ezo_ph).set_calibration_point_mid(7.00);
+
+  - platform: template
+    entity_category: config
+    name: "pH Calibrate Low"
+    icon: "mdi:tune-vertical"
+    on_press:
+      lambda: id(pool_ezo_ph).set_calibration_point_low(4.00);
+
+  - platform: template
+    entity_category: config
+    name: "pH Calibrate High"
+    icon: "mdi:tune-vertical"
+    on_press:
+      lambda: id(pool_ezo_ph).set_calibration_point_high(10.00);
+

@@ -1,0 +1,272 @@
+esphome:
+  name: pergola-fan-remote
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: arduino
+
+logger:
+api:
+ota:
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_pass
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Pergola-Fan-Remote"
+
+captive_portal:
+
+binary_sensor:
+  # Fan running state
+  - platform: template
+    name: "Pergola Fan State"
+    icon: "mdi:ceiling-fan"
+    id: fan_state
+    device_class: running
+    lambda: |-
+      if (id(fan_speed_sens).state > 0) {
+        return true;
+      } else {
+        return false;
+      }
+
+  # Button 1 - Speed Up
+  - platform: gpio
+    pin:
+      number: 4
+      inverted: true
+      mode: INPUT_OUTPUT_OPEN_DRAIN
+    name: "Pergola Fan Speed Up Button"
+    on_press:
+      then:
+        lambda: |-
+          if (id(fan_state).state == false) {
+            id(fan_speed_sens).publish_state(3);
+          } else if (id(fan_speed_sens).state < 6) {
+            id(fan_speed_sens).publish_state(id(fan_speed_sens).state += 1);
+          }
+
+  # Button 2 - Speed Down
+  - platform: gpio
+    pin:
+      number: 5
+      inverted: true
+      mode: INPUT_OUTPUT_OPEN_DRAIN
+    name: "Pergola Fan Speed Down Button"
+    on_press:
+      then:
+        lambda: |-
+          if (id(fan_state).state == false) {
+            id(fan_speed_sens).publish_state(3);
+          } else if (id(fan_speed_sens).state > 1) {
+            id(fan_speed_sens).publish_state(id(fan_speed_sens).state -= 1);
+          }
+
+  # Button 3 - Fan Off
+  - platform: gpio
+    pin:
+      number: 6
+      inverted: true
+      mode: INPUT_OUTPUT_OPEN_DRAIN
+    name: "Pergola Fan Power Off Button"
+    on_press:
+      then:
+        lambda: |-
+            id(fan_speed_sens).publish_state(0);
+
+  # Button 4 - Change Direction
+  - platform: gpio
+    pin:
+      number: 7
+      inverted: true
+      mode: INPUT_OUTPUT_OPEN_DRAIN
+    name: "Pergola Fan Change Direction Button"
+
+  # Button 5 - Set Code
+  - platform: gpio
+    pin:
+      number: 8
+      inverted: true
+      mode: INPUT_OUTPUT_OPEN_DRAIN
+    name: "Pergola Fan Set Code Button"
+
+output:
+  # Button 1 - Speed Up
+  - platform: gpio
+    pin:
+      number: 4
+      inverted: true
+      mode: INPUT_OUTPUT_OPEN_DRAIN
+    id: pin_speed_up
+
+  # Button 2 - Speed Down
+  - platform: gpio
+    pin:
+      number: 5
+      inverted: true
+      mode: INPUT_OUTPUT_OPEN_DRAIN
+    id: pin_speed_down
+
+  # Button 3 - Power Off
+  - platform: gpio
+    pin:
+      number: 6
+      inverted: true
+      mode: INPUT_OUTPUT_OPEN_DRAIN
+    id: pin_power_off
+
+  # Button 4 - Change Direction
+  - platform: gpio
+    pin:
+      number: 7
+      inverted: true
+      mode: INPUT_OUTPUT_OPEN_DRAIN
+    id: pin_change_direction
+
+  # Button 5 - Set Code
+  - platform: gpio
+    pin:
+      number: 8
+      inverted: true
+      mode: INPUT_OUTPUT_OPEN_DRAIN
+    id: pin_set_code
+
+sensor:
+  # Fan Speed sensor
+  - platform: template
+    name: "Pergola Fan Speed"
+    icon: "mdi:speedometer-medium"
+    id: fan_speed_sens
+    on_value:
+      then:
+        lambda: |-
+          id(num_fan_speed).publish_state(x);
+
+number:
+  - platform: template
+    name: "Pergola Fan Speed Control"
+    icon: "mdi:fan"
+    id: num_fan_speed
+    min_value: 0
+    max_value: 6
+    step: 1
+    initial_value: 0
+    restore_value: no
+    set_action:
+      lambda: |-
+        int diff;
+
+        if (x == 0) {
+          // control gpio output directly as button.press performs poorly
+          id(pin_power_off).turn_on();
+          delay(50);
+          id(pin_power_off).turn_off();
+
+          id(fan_speed_sens).publish_state(x);
+          return;
+        }
+
+        if (id(fan_state).state == false) {
+          // control gpio output directly as button.press performs poorly
+          id(pin_speed_up).turn_on();
+          delay(50);
+          id(pin_speed_up).turn_off();
+
+          delay(300);
+          diff = x - 3;
+        }
+        else {
+          diff = x - id(num_fan_speed).state;
+        }
+
+        if (diff == 0) {
+          return;
+        }
+
+        bool neg = false;
+        if (diff < 0) {
+          neg = true;
+        }
+
+        while (diff != 0) {
+          if (neg) {
+            // control gpio output directly as button.press performs poorly
+            id(pin_speed_down).turn_on();
+            delay(50);
+            id(pin_speed_down).turn_off();
+        
+            diff++;
+          }
+          else {
+            // control gpio output directly as button.press performs poorly
+            id(pin_speed_up).turn_on();
+            delay(50);
+            id(pin_speed_up).turn_off();
+        
+            diff--;
+          }
+
+          delay(300);
+        }
+        
+        id(fan_speed_sens).publish_state(x);
+
+button:
+  # Button 1 - Speed Up
+  - platform: output
+    name: "Pergola Fan Speed Up"
+    icon: "mdi:fan-chevron-up"
+    id: btn_speed_up
+    output: pin_speed_up
+    duration: 50ms
+
+  # Button 2 - Speed Down
+  - platform: output
+    name: "Pergola Fan Speed Down"
+    icon: "mdi:fan-chevron-down"
+    id: btn_speed_down
+    output: pin_speed_down
+    duration: 50ms
+
+  # Button 3 - Power Off
+  - platform: output
+    name: "Pergola Fan Power Off"
+    icon: "mdi:fan-off"
+    id: btn_power_off
+    output: pin_power_off
+    duration: 50ms
+
+  # Button 4 - Change Direction
+  - platform: output
+    name: "Pergola Fan Change Direction"
+    icon: "mdi:rotate-3d-variant"
+    id: btn_change_direction
+    output: pin_change_direction
+    duration: 50ms
+
+  # Button 5 - Set Code
+  - platform: output
+    name: "Pergola Fan Set Code"
+    icon: "mdi:gesture-tap-button"
+    id: btn_set_code
+    output: pin_set_code
+    duration: 50ms
+
+switch:
+  - platform: template
+    name: "Pergola Fan Power"
+    icon: "mdi:power"
+    lambda: |-
+      if (id(fan_state).state) {
+        return true;
+      } else {
+        return false;
+      }
+    turn_on_action:
+      - button.press: btn_speed_up
+    turn_off_action:
+      - button.press: btn_power_off
