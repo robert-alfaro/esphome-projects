@@ -1,5 +1,5 @@
 esphome:
-  name: esp32c3-bt-proxy
+  name: bt-proxy
   name_add_mac_suffix: true
   platformio_options:
     board_build.mcu: esp32c3
@@ -7,6 +7,12 @@ esphome:
   on_boot:
     priority: 250
     then:
+      # set chip variant sensor
+      - text_sensor.template.publish:
+          id: chip_variant
+          state: "esp32c3"
+
+      # start ble scanning after 15 seconds
       - delay: 15s
       - lambda: |-
           id(ble_tracker).set_scan_continuous(true); 
@@ -32,6 +38,23 @@ wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_pass
 
+sensor:
+  - platform: wifi_signal
+    name: WiFi Signal
+    entity_category: "diagnostic"
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: IP Address
+      icon: mdi:lan
+
+  - platform: template
+    id: chip_variant
+    name: Chip Variant
+    entity_category: diagnostic
+    icon: mdi:chip
+
 esp32_ble_tracker:
   id: ble_tracker
   scan_parameters:
@@ -47,4 +70,37 @@ button:
   - platform: safe_mode
     name: Restart (Safe Mode)
     entity_category: diagnostic
+
+  - platform: template
+    name: Identify
+    entity_category: diagnostic
+    icon: mdi:crosshairs-gps
+    on_press:
+      - light.turn_on: discovery_led
+
+light:
+  # use built-in RGB LED on esp32c3-devkit-m-1
+  - platform: esp32_rmt_led_strip
+    rgb_order: GRB
+    pin: GPIO8
+    num_leds: 1
+    rmt_channel: 0
+    chipset: ws2812
+    id: discovery_led
+    effects:
+      - pulse:
+          name: Fast Pulse
+          transition_length: 0.5s
+          update_interval: 0.5s
+          min_brightness: 0%
+          max_brightness: 80%
+    on_turn_on:
+      - light.turn_on:
+          id: discovery_led
+          red: 0%
+          green: 0%
+          blue: 100%
+          effect: Fast Pulse
+      - delay: 10 sec
+      - light.turn_off: discovery_led
 

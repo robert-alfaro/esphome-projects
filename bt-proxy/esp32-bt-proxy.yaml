@@ -1,6 +1,13 @@
 esphome:
-  name: esp32-bt-proxy
+  name: bt-proxy
   name_add_mac_suffix: true
+  on_boot:
+    priority: 250
+    then:
+      # set chip variant sensor
+      - text_sensor.template.publish:
+          id: chip_variant
+          state: "esp32"
 
 esp32:
   board: esp32dev
@@ -17,6 +24,23 @@ wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_pass
 
+sensor:
+  - platform: wifi_signal
+    name: WiFi Signal
+    entity_category: "diagnostic"
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: IP Address
+      icon: mdi:lan
+
+  - platform: template
+    id: chip_variant
+    name: Chip Variant
+    entity_category: diagnostic
+    icon: mdi:chip
+
 esp32_ble_tracker:
   scan_parameters:
     active: true
@@ -29,5 +53,3 @@ button:
     name: Restart (Safe Mode)
     entity_category: diagnostic
 
-dashboard_import:
-  package_import_url: github://esphome/bluetooth-proxies/esp32-generic.yaml@main
