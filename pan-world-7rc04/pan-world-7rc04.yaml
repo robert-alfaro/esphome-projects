@@ -141,6 +141,19 @@ sensor:
         lambda: |-
           id(num_fan_speed).publish_state(x);
 
+  - platform: uptime
+    name: "Uptime"
+
+  - platform: wifi_signal
+    name: WiFi Signal
+    entity_category: "diagnostic"
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: IP Address
+      icon: mdi:lan
+
 number:
   - platform: template
     name: "Pergola Fan Speed Control"
