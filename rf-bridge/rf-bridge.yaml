@@ -1,0 +1,156 @@
+esphome:
+  name: rf-bridge
+  friendly_name: RF Bridge
+  name_add_mac_suffix: true
+  platform: ESP8266
+  board: esp01_1m
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_pass
+
+web_server:
+  port: 80
+
+ota:
+
+logger:
+  baud_rate: 0  # disable uart logging; uart used for rf chip
+
+uart:
+  tx_pin: GPIO1
+  rx_pin: GPIO3
+  baud_rate: 19200
+
+binary_sensor:
+  - platform: status
+    name: "Status"
+
+  - platform: gpio
+    pin:
+      number: GPIO0
+      inverted: true
+    name: Pairing Button
+
+sensor:
+  - platform: wifi_signal
+    name: WiFi Signal
+    entity_category: diagnostic
+
+  - platform: uptime
+    name: Uptime
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: IP Address
+      icon: mdi:lan
+
+status_led:
+  pin:
+    number: GPIO13
+    inverted: yes
+
+remote_receiver:
+  pin: GPIO4
+  tolerance: 50%
+  dump:
+    - raw
+    - rc_switch
+
+remote_transmitter:
+  pin: GPIO5
+  carrier_duty_percent: 100%
+
+#
+# RF Bridge implementation
+#   - Relays received rf codes to Home Assistant as events
+#   - Provides services for Home Assistant to send rf codes
+#
+
+api:
+  services:
+    # ITEAD (built-in)
+
+    - service: send_code
+      variables:
+        sync: int
+        low: int
+        high: int
+        code: int
+      then:
+        - rf_bridge.send_code:
+            sync: !lambda 'return sync;'
+            low: !lambda 'return low;'
+            high: !lambda 'return high;'
+            code: !lambda 'return code;'
+
+    - service: send_raw
+      variables:
+        raw: string
+      then:
+        - rf_bridge.send_raw:
+            raw: !lambda 'return raw;'
+
+    - service: learn
+      then:
+        - rf_bridge.learn
+
+    # PORTISCH FIRMWARE (requires flashing EFM8BB1)
+
+    - service: send_advanced_code
+      variables:
+        length: int
+        protocol: int
+        code: string
+      then:
+        - rf_bridge.send_advanced_code:
+            length: !lambda 'return length;'
+            protocol: !lambda 'return protocol;'
+            code: !lambda 'return code;'
+
+    - service: start_advanced_sniffing
+      then:
+        - rf_bridge.start_advanced_sniffing
+
+    - service: stop_advanced_sniffing
+      then:
+        - rf_bridge.stop_advanced_sniffing
+
+    - service: start_bucket_sniffing
+      then:
+        - rf_bridge.start_bucket_sniffing
+
+    - service: beep
+      variables:
+        duration: int
+      then:
+        - rf_bridge.beep:
+            duration: !lambda 'return duration;'
+
+rf_bridge:
+  on_code_received:
+    - homeassistant.event:
+        event: esphome.rf_code_received
+        data:
+          sync: !lambda 'return format_hex(data.sync);'
+          low: !lambda 'return format_hex(data.low);'
+          high: !lambda 'return format_hex(data.high);'
+          code: !lambda 'return format_hex(data.code);'
+
+  on_advanced_code_received:
+    - homeassistant.event:
+        event: esphome.rf_advanced_code_received
+        data:
+          length: !lambda 'return format_hex(data.length);'
+          protocol: !lambda 'return format_hex(data.protocol);'
+          code: !lambda 'return data.code;'
+
+#
+# Device-specific packages
+#
+
+packages:
+  base: !include packages/base.yaml
+  rayrun_rm03: !include packages/rayrun_rm03.yaml
+
