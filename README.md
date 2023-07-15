@@ -21,7 +21,7 @@ Create Python3 virtual environment and install esphome:
 ```bash
 python -m venv venv
 . venv/bin/activate
-pip install esphome
+pip install -r requirements.txt
 ```
 
 Create `secrets.yaml` in the root of the repo, fill with credentials:
@@ -36,4 +36,15 @@ wifi_pass: <your pass>
 ```bash
 esphome run <proj_name>/<proj_name>.yaml --device=<serial or hostname>
 ```
+
+## Upgrade esphome
+
+Update the python module:
+
+```bash
+. venv/bin/activate
+pip install --upgrade esphome
+```
+
+Rebuild & Flash (prefer OTA) devices (see above section).
 
